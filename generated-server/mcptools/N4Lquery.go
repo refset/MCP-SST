@@ -7,6 +7,7 @@ import (
 )
 
 // Input Schema for the N4Lquery tool
+
 const N4LqueryInputSchema = `{
   "properties": {
     "body": {
@@ -270,7 +271,106 @@ func N4LqueryHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 
 
 	//  WHAT DO WE ADD HERE????    \search "string" \chapter one \context friendly ... hints
-	//  Need to pass this to http://webserver:8080/searchN4L 
+	//  Need to pass this to http://webserver:8080/searchN4L
+
+	if args, ok := request.Params.Arguments.(map[string]any); ok {
+		value := args["key_name"] // Now you can index it
+		fmt.Println(value)
+	}
+	
+	
+	/*
+
+type CallToolRequest struct {
+    JSONRPC string `json:"jsonrpc"`
+    ID      string `json:"id"`
+    Method  string `json:"method"` // Always "tools/call"
+    Params  struct {
+        Name      string                 `json:"name"`
+        Arguments map[string]interface{} `json:"arguments"`
+    } `json:"params"`
+  }
+   
+
+type CallToolResult struct {
+    Content []Content `json:"content"`
+    IsError bool      `json:"isError,omitempty"`
+}
+
+func handleMyTool(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+    // 1. Extract argument
+    arg := req.Params.Arguments["arg1"].(string)
+
+    // 2. Perform logic...
+
+    // 3. Return result
+    return mcp.NewToolResultText("Success"), nil
+    }
+
+	   Helper functions:
+	   
+	   mcp.NewToolResultText("string"): Creates a success result with text content.
+mcp.NewToolResultError("string"): Creates a result with IsError set to true. 
+
+
+func MyToolHandler(ctx context.Context, session *mcp.ServerSession, params *MyParams) (*mcp.CallToolResult, error) {
+    // 1. Create a request to the external HTTPS API
+    req, _ := http.NewRequestWithContext(ctx, "GET", "https://example.com", nil)
+    
+    // 2. Add necessary headers/auth
+    req.Header.Set("Authorization", "Bearer " + os.Getenv("API_KEY"))
+
+    // 3. Execute the call
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil {
+        return nil, err
+    }
+    defer resp.Body.Close()
+
+    // 4. Return data to the MCP client
+    var result map[string]interface{}
+    json.NewDecoder(resp.Body).Decode(&result)
+    
+    return &mcp.CallToolResult{
+        Content: []mcp.Content{mcp.TextContent{Text: fmt.Sprintf("%v", result)}},
+    }, nil
+}
+
+
+
+	   ////////////////////////
+
+
+
+	   package main
+
+import (
+    "fmt"
+    "net/http"
+    "net/url"
+    "io"
+)
+
+func main() {
+    // 1. Define form variables
+    formData := url.Values{
+        "name": {"John Doe"},
+        "occupation": {"gardener"},
+    }
+
+    // 2. Make the POST request
+    resp, err := http.PostForm("https://httpbin.org/post", formData)
+    if err != nil {
+        panic(err)
+    }
+    defer resp.Body.Close()
+
+    // 3. Read the response
+    body, _ := io.ReadAll(resp.Body)
+    fmt.Println(string(body))
+}
+	   
+	*/
 
 	
 	return nil, fmt.Errorf("%s not implemented", "N4Lquery")

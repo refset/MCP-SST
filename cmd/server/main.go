@@ -1,22 +1,27 @@
 package main
 
 import (
-    "log"
-    "os"
-    // Import your generated code
-    "github.com/markburgess/MCP-SST" 
-    "github.com/modelcontextprotocol/go-sdk/mcp"
+	"fmt"
+	//"github.com/markburgess/MCP-SST/generated-server" 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func main() {
-    // 1. Create a new MCP server
-    s := mcp.NewServer()
+	// 1. Create a new MCP server
+	server := mcp.NewServer(
+		&mcp.Implementation{
+			Name:    "my-server",
+			Version: "1.0.0",
+		},
+		&mcp.ServerOptions{},
+	)
 
-    // 2. Register tools from generated code
-    generated.RegisterTools(s)
 
-    // 3. Serve via stdio
+	fmt.Println(server)
+	//generated.RegisterTools(s)
+
+	/* 3. Serve via stdio
     if err := s.Serve(stdio.NewTransport()); err != nil {
         log.Fatalf("Fatal error: %v", err)
-    }
+    }*/
 }
