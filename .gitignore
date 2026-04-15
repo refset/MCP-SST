@@ -1,0 +1,89 @@
+# intermediate / autogen
+*_test_log
+*.pdf
+*.la
+*.kate-swp
+*.lo
+*.out
+*.cmp
+*.bak
+.deps
+.libs
+stamp-h1
+plot
+cacheroot
+key.pem
+cert.pem
+
+*edit_me.n4l
+/test-driver
+/tests/unit/*.log
+/tests/load/*.log
+
+/configure_flags.env
+__pycache__/
+
+N4L-db
+search_broad
+search_by_node
+search_clusters
+search_contrawave_quantum
+search_simple_text
+search_by_name
+search_by_node_text
+search_contrawave_ambiguous
+search_interactive
+search_by_name_unicode
+search_clusters_functions
+search_contrawave
+search_noninteractive
+search_systematic_knowledge_1
+search_systematic_knowledge_2
+search_boundary_nodes
+search_coarse_grain*
+search_maze
+search_maze2
+search_wardley
+ScanText
+http_server
+json
+
+# tags
+TAGS
+tags
+cscope.*
+
+# vim
+*~
+.*.swp
+.*.swo
+
+# emacs
+.#*
+*~
+
+\#*#
+.dir-locals.el
+/contrib/*.elc
+
+# eclipse
+.cproject
+.project
+.settings
+
+# qt-creator
+/core.config
+/core.creator
+/core.creator.user
+/core.files
+/core.includes
+*.autosave
+
+# Mac Finder
+.DS_Store
+stories
+conceptualize
+
+# SHD ###########
+# `air`
+**/tmp
