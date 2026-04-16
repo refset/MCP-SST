@@ -2,26 +2,30 @@ package main
 
 import (
 	"fmt"
-	//"github.com/markburgess/MCP-SST/generated-server" 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"os"
+	"github.com/markburgess/MCP-SST/generated-server/mcptools" 
+	//"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
 )
+
 
 func main() {
 	// 1. Create a new MCP server
-	server := mcp.NewServer(
-		&mcp.Implementation{
-			Name:    "my-server",
-			Version: "1.0.0",
-		},
-		&mcp.ServerOptions{},
-	)
+
+	mcpserver := server.NewMCPServer("MCP-SSTorytime", "1.0.0")
+	
+
+	
+	// 2. Register a tool (AddTool) with a handler function
+
+	mcpserver.AddTool(mcptools.NewN4LqueryMCPTool(),mcptools.N4LqueryHandler)
+
+	httpServer := server.NewStreamableHTTPServer(mcpserver)
 
 
-	fmt.Println(server)
-	//generated.RegisterTools(s)
-
-	/* 3. Serve via stdio
-    if err := s.Serve(stdio.NewTransport()); err != nil {
-        log.Fatalf("Fatal error: %v", err)
-    }*/
+	// Start the server
+	if err := httpServer.Start(":8888"); err != nil {
+		fmt.Println("Server failed to start: %v", err)
+		os.Exit(-1)
+	}
 }

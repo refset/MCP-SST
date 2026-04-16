@@ -1,8 +1,15 @@
 package mcptools
 
 import (
+	"net/http"
+	"net/url"
+	"io"
 	"context"
 	"fmt"
+	"crypto/tls"
+	"crypto/x509"
+	"os"
+
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -259,121 +266,107 @@ func NewN4LqueryMCPTool() mcp.Tool {
 
 func N4LqueryHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 
-	// IMPORTANT: Replace the following placeholder implementation with your actual logic.
-	// Use the 'request' parameter to access tool call arguments.
+
+	/* type CallToolRequest struct {
+                  JSONRPC string `json:"jsonrpc"`
+                  ID      string `json:"id"`
+                  Method  string `json:"method"` // Always "tools/call"
+                  Params  struct {
+                  Name      string                 `json:"name"`
+                  Arguments map[string]interface{} `json:"arguments"`
+                  } `json:"params"`
+          }*/
+
+	var mcp_search_command string
+	
+	if args, ok := request.Params.Arguments.(map[string]any); ok {
+		mcp_search_command = args["command_request"].(string)
+		fmt.Println("DEBUG ARG string:",request.Params.Name,"ARGS",mcp_search_command)
+	}
+	
 	// Make HTTP calls or interact with services as needed.
 	// Return an *mcp.CallToolResult with the response payload, or an error.
 
-	// Example placeholder implementation:
-	// Extract the parameters from the request and parse them.
-	// Call your backend API or perform the necessary operations using 'params'.
-	// Handle the response and errors accordingly.
+	// We need to submit a simple form to http_server
 
+	formdata := url.Values{
+		"name": { mcp_search_command },
+	}
 
-	//  WHAT DO WE ADD HERE????    \search "string" \chapter one \context friendly ... hints
-	//  Need to pass this to http://webserver:8080/searchN4L
+	// Reroute query to the SST server
+	uri := "https://127.0.0.1:8443/searchN4L"
 
-	if args, ok := request.Params.Arguments.(map[string]any); ok {
-		value := args["key_name"] // Now you can index it
-		fmt.Println(value)
+	var body []byte
+	
+	fmt.Println("Test the certificate",uri,formdata)
+	
+	resp, err := http.PostForm(uri, formdata)
+	
+	if err != nil {
+		fmt.Printf("POST: Unable to forward request: %s\n", "N4Lquery")
+		body = SelfSignedForm(uri,mcp_search_command,formdata)
+		return nil, fmt.Errorf("%s not implemented", "N4Lquery")
 	}
 	
+	defer resp.Body.Close()
 	
-	/*
-
-type CallToolRequest struct {
-    JSONRPC string `json:"jsonrpc"`
-    ID      string `json:"id"`
-    Method  string `json:"method"` // Always "tools/call"
-    Params  struct {
-        Name      string                 `json:"name"`
-        Arguments map[string]interface{} `json:"arguments"`
-    } `json:"params"`
-  }
-   
-
-type CallToolResult struct {
-    Content []Content `json:"content"`
-    IsError bool      `json:"isError,omitempty"`
-}
-
-func handleMyTool(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-    // 1. Extract argument
-    arg := req.Params.Arguments["arg1"].(string)
-
-    // 2. Perform logic...
-
-    // 3. Return result
-    return mcp.NewToolResultText("Success"), nil
-    }
-
-	   Helper functions:
-	   
-	   mcp.NewToolResultText("string"): Creates a success result with text content.
-mcp.NewToolResultError("string"): Creates a result with IsError set to true. 
-
-
-func MyToolHandler(ctx context.Context, session *mcp.ServerSession, params *MyParams) (*mcp.CallToolResult, error) {
-    // 1. Create a request to the external HTTPS API
-    req, _ := http.NewRequestWithContext(ctx, "GET", "https://example.com", nil)
-    
-    // 2. Add necessary headers/auth
-    req.Header.Set("Authorization", "Bearer " + os.Getenv("API_KEY"))
-
-    // 3. Execute the call
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil {
-        return nil, err
-    }
-    defer resp.Body.Close()
-
-    // 4. Return data to the MCP client
-    var result map[string]interface{}
-    json.NewDecoder(resp.Body).Decode(&result)
-    
-    return &mcp.CallToolResult{
-        Content: []mcp.Content{mcp.TextContent{Text: fmt.Sprintf("%v", result)}},
-    }, nil
-}
-
-
-
-	   ////////////////////////
-
-
-
-	   package main
-
-import (
-    "fmt"
-    "net/http"
-    "net/url"
-    "io"
-)
-
-func main() {
-    // 1. Define form variables
-    formData := url.Values{
-        "name": {"John Doe"},
-        "occupation": {"gardener"},
-    }
-
-    // 2. Make the POST request
-    resp, err := http.PostForm("https://httpbin.org/post", formData)
-    if err != nil {
-        panic(err)
-    }
-    defer resp.Body.Close()
-
-    // 3. Read the response
-    body, _ := io.ReadAll(resp.Body)
-    fmt.Println(string(body))
-}
-	   
-	*/
-
+	body, _ = io.ReadAll(resp.Body)
 	
+	/* type CallToolResult struct {
+                 Content []Content `json:"content"`
+                 IsError bool      `json:"isError,omitempty"`
+        } */
+	
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{mcp.TextContent{Text: fmt.Sprintf("%v", string(body))}},
+	}, nil
+
 	return nil, fmt.Errorf("%s not implemented", "N4Lquery")
 }
 
 
+// *********************************************************************
+
+func SelfSignedForm(uri,query string,formdata url.Values) []byte {
+	
+	// curl -Iv https://127.0.0.1:8443 --cacert cert.pem
+
+	caCert, err := os.ReadFile("../server/cert.pem")
+	
+	if err != nil {
+		fmt.Println("Couldn't load server's self-signed certificate file",err)
+		return nil
+	}
+	
+	// 2. Create a CertPool and add the CA certificate
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+	
+	// 3. Configure TLS with the custom CertPool
+	tlsConfig := &tls.Config{
+		RootCAs: caCertPool,
+	}
+	
+	// 4. Create an HTTP client with the custom TLS configuration
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+	}
+	
+	fmt.Println("Try to connect FORM",uri,formdata)
+	
+	resp, err2 := client.PostForm(uri, formdata)
+	
+	if err2 != nil {
+		fmt.Printf("POST: Unable to forward request: %s\n", "N4Lquery")
+		return nil
+	}
+	
+	defer resp.Body.Close()
+	
+	body, _ := io.ReadAll(resp.Body)
+	
+	fmt.Println("SELF_SIGNED",string(body))
+	return body
+}
