@@ -9,12 +9,31 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"os"
-
+	"flag"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
 
+// ******************************************************************************
 
+func Init() string {
+
+	flag.Usage = Usage
+
+	resourcePtr := flag.String("cert", "../server/cert.pem", "self-signed certicate path/name")
+
+	flag.Parse()
+
+	return *resourcePtr
+}
+
+//**************************************************************
+
+func Usage() {
+
+	fmt.Printf("usage: main [-cert path/to/https-cert]\n")
+	os.Exit(1)
+}
 
 // ******************************************************************************
 // Input Schema for the N4Lquery tool - this is where we have to add tooltips
@@ -421,7 +440,6 @@ func NewN4LqueryMCPTool() mcp.Tool {
 
 func N4LqueryHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 
-
 	/* type CallToolRequest struct {
                   JSONRPC string `json:"jsonrpc"`
                   ID      string `json:"id"`
@@ -446,7 +464,6 @@ func N4LqueryHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 	
 	// Make HTTP calls or interact with services as needed.
 	// Return an *mcp.CallToolResult with the response payload, or an error.
-
 	// We need to submit a simple form to http_server
 
 	formdata := url.Values{
@@ -454,6 +471,7 @@ func N4LqueryHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 	}
 
 	// Reroute query to the SST server
+
 	uri := "https://127.0.0.1:8443/searchN4L"
 
 	var body []byte
@@ -493,14 +511,18 @@ func SelfSignedForm(uri,query string,formdata url.Values) []byte {
 	
 	// curl -Iv https://127.0.0.1:8443 --cacert cert.pem
 
-	caCert, err := os.ReadFile("../server/cert.pem")
+	var self_signed_certificate = Init()
+
+	fmt.Println("Reading a self-signed certificate",self_signed_certificate)
+	caCert, err := os.ReadFile(self_signed_certificate)
 	
 	if err != nil {
-		fmt.Println("Couldn't load server's self-signed certificate file",err)
+		fmt.Println("Couldn't load server's self-signed certificate file",self_signed_certificate,err)
 		return nil
 	}
 	
 	// 2. Create a CertPool and add the CA certificate
+
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCert)
 	
@@ -516,7 +538,7 @@ func SelfSignedForm(uri,query string,formdata url.Values) []byte {
 		},
 	}
 	
-	fmt.Println("Try to connect FORM",uri,formdata)
+	fmt.Println("Try to connect to form interface...",uri,formdata)
 	
 	resp, err2 := client.PostForm(uri, formdata)
 	
@@ -528,7 +550,7 @@ func SelfSignedForm(uri,query string,formdata url.Values) []byte {
 	defer resp.Body.Close()
 	
 	body, _ := io.ReadAll(resp.Body)
-	
-	fmt.Println("SELF_SIGNED",string(body))
+
+	fmt.Println("Succeeded, sending response...")
 	return body
 }
