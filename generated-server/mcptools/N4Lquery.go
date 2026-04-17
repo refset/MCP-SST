@@ -280,7 +280,12 @@ func N4LqueryHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 	var mcp_search_command string
 	
 	if args, ok := request.Params.Arguments.(map[string]any); ok {
-		mcp_search_command = args["command_request"].(string)
+		//mcp_search_command = args["command_request"].(string)
+		if body, ok := args["body"].(map[string]any); ok {
+			if name, ok := body["name"].(string); ok {
+				mcp_search_command = name
+			}
+		}
 		fmt.Println("DEBUG ARG string:",request.Params.Name,"ARGS",mcp_search_command)
 	}
 	
@@ -305,7 +310,9 @@ func N4LqueryHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 	if err != nil {
 		fmt.Printf("POST: Unable to forward request: %s\n", "N4Lquery")
 		body = SelfSignedForm(uri,mcp_search_command,formdata)
-		return nil, fmt.Errorf("%s not implemented", "N4Lquery")
+		if body == nil {
+			return nil, fmt.Errorf("%s upstream unreachable", "N4Lquery")
+		}
 	}
 	
 	defer resp.Body.Close()
@@ -318,7 +325,7 @@ func N4LqueryHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
         } */
 	
 	return &mcp.CallToolResult{
-		Content: []mcp.Content{mcp.TextContent{Text: fmt.Sprintf("%v", string(body))}},
+		Content: []mcp.Content{mcp.NewTextContent(string(body))},
 	}, nil
 
 	return nil, fmt.Errorf("%s not implemented", "N4Lquery")
