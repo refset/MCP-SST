@@ -29,8 +29,12 @@ func main() {
 	mcptools.StartWebSocketHub(*wsAddr)
 
 	// 2. Build the MCP server + register tools.
-	mcpserver := server.NewMCPServer("MCP-SSTorytime", "1.1.0")
+	mcpserver := server.NewMCPServer(
+		"MCP-SSTorytime", "1.1.0",
+		server.WithToolCapabilities(true),
+	)
 	mcpserver.AddTool(mcptools.NewN4LqueryMCPTool(), mcptools.N4LqueryHandler)
+	mcpserver.AddTool(mcptools.NewN4LdriveUIMCPTool(), mcptools.N4LdriveUIHandler)
 	mcpserver.AddTool(mcptools.NewListSessionsMCPTool(), mcptools.ListSessionsHandler)
 
 	// 3. Serve MCP over stdio — the transport Claude Code expects

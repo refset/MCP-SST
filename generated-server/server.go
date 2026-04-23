@@ -17,6 +17,7 @@ func NewMCPServer() *server.MCPServer {
 
 	// Register all tools
 	s.AddTool(mcptools.NewN4LqueryMCPTool(), mcptools.N4LqueryHandler)
+	s.AddTool(mcptools.NewN4LdriveUIMCPTool(), mcptools.N4LdriveUIHandler)
 
 	return s
 }
