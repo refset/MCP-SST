@@ -1,17 +1,16 @@
 package mcptools
 
 import (
-	"net/http"
-	"net/url"
-	"io"
 	"context"
+	"encoding/json"
 	"fmt"
-	"crypto/tls"
-	"crypto/x509"
-	"os"
+	"time"
+
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
+// Retained for backwards compatibility with any legacy callers that
+// still set it; the WebSocket transport ignores it entirely.
 var SELF_SIGNED_CERT string
 
 // ******************************************************************************
@@ -429,105 +428,62 @@ func N4LqueryHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
                   } `json:"params"`
           }*/
 
-	var mcp_search_command string
-	
+	// Extract query string + optional session id. The baseline schema
+	// nests the query inside a "body" object; callers may also pass
+	// `name` or `session_id` at the top level for convenience.
+	var (
+		queryStr  string
+		sessionID string
+	)
 	if args, ok := request.Params.Arguments.(map[string]any); ok {
-		//mcp_search_command = args["command_request"].(string)
 		if body, ok := args["body"].(map[string]any); ok {
-			if name, ok := body["name"].(string); ok {
-				mcp_search_command = name
+			if n, ok := body["name"].(string); ok {
+				queryStr = n
+			}
+			if s, ok := body["session_id"].(string); ok {
+				sessionID = s
 			}
 		}
-		fmt.Println("DEBUG ARG string:",request.Params.Name,"ARGS",mcp_search_command)
-	}
-	
-	// Make HTTP calls or interact with services as needed.
-	// Return an *mcp.CallToolResult with the response payload, or an error.
-	// We need to submit a simple form to http_server
-
-	formdata := url.Values{
-		"name": { mcp_search_command },
-	}
-
-	// Reroute query to the SST server
-
-	uri := "https://127.0.0.1:8443/searchN4L"
-
-	var body []byte
-	
-	fmt.Println("Test the certificate",uri,formdata)
-	
-	resp, err := http.PostForm(uri, formdata)
-	
-	if err != nil {
-		fmt.Printf("POST: Unable to forward request: %s\n", "N4Lquery")
-		body = SelfSignedForm(uri,mcp_search_command,formdata)
-		if body == nil {
-			return nil, fmt.Errorf("%s upstream unreachable", "N4Lquery")
+		if queryStr == "" {
+			if n, ok := args["name"].(string); ok {
+				queryStr = n
+			}
+		}
+		if sessionID == "" {
+			if s, ok := args["session_id"].(string); ok {
+				sessionID = s
+			}
 		}
 	}
-	
-	defer resp.Body.Close()
-	
-	body, _ = io.ReadAll(resp.Body)
-	
-	/* type CallToolResult struct {
-                 Content []Content `json:"content"`
-                 IsError bool      `json:"isError,omitempty"`
-        } */
-	
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{mcp.NewTextContent(string(body))},
-	}, nil
 
-	return nil, fmt.Errorf("%s not implemented", "N4Lquery")
-}
+	if sessionID == "" {
+		picked, err := PickSession()
+		if err != nil {
+			return nil, err
+		}
+		sessionID = picked
+	}
 
-
-// *********************************************************************
-
-func SelfSignedForm(uri,query string,formdata url.Values) []byte {
-	
-	// curl -Iv https://127.0.0.1:8443 --cacert cert.pem
-
-	fmt.Println("Reading a self-signed certificate",SELF_SIGNED_CERT)
-	caCert, err := os.ReadFile(SELF_SIGNED_CERT)
-	
+	raw, err := CallSession(sessionID, "search", map[string]any{"name": queryStr}, 60*time.Second)
 	if err != nil {
-		fmt.Println("Couldn't load server's self-signed certificate file",SELF_SIGNED_CERT,err)
-		return nil
+		return nil, fmt.Errorf("N4Lquery: %w", err)
 	}
-	
-	// 2. Create a CertPool and add the CA certificate
 
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
-	
-	// 3. Configure TLS with the custom CertPool
-	tlsConfig := &tls.Config{
-		RootCAs: caCertPool,
+	// The SPA returns upstream's PackageResponse envelope verbatim.
+	// Feed it back to the LLM as JSON text so prompts can match the
+	// shape described in the tool's input schema.
+	out := string(raw)
+	if out == "" {
+		out = "null"
 	}
-	
-	// 4. Create an HTTP client with the custom TLS configuration
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: tlsConfig,
-		},
+	// Sanity-check that it parses as JSON so the LLM gets a clean
+	// payload instead of a shim error string.
+	var probe any
+	if err := json.Unmarshal(raw, &probe); err != nil {
+		return nil, fmt.Errorf("N4Lquery: session returned non-JSON payload: %w", err)
 	}
-	
-	fmt.Println("Try to connect to form interface...",uri,formdata)
-	
-	resp, err2 := client.PostForm(uri, formdata)
-	
-	if err2 != nil {
-		fmt.Printf("POST: Unable to forward request: %s\n", "N4Lquery")
-		return nil
-	}
-	
-	defer resp.Body.Close()
-	
-	body, _ := io.ReadAll(resp.Body)
 
-	fmt.Println("Succeeded, sending response...")
-	return body
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{mcp.NewTextContent(out)},
+	}, nil
 }

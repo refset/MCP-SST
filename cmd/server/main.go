@@ -1,59 +1,48 @@
 package main
 
+// MCP bridge between Claude-Code (stdio) and an SSTorytime SPA tab
+// (WebSocket). See generated-server/mcptools/hub.go for the hub
+// protocol.
+//
+// Run:
+//   go run ./cmd/server                  # stdio MCP + ws hub on :8889
+//   go run ./cmd/server -ws :9100        # alternate ws port
+//
+// Install in Claude Code:
+//   claude mcp add sst -- go run ./cmd/server
+
 import (
+	"flag"
 	"fmt"
 	"os"
-	"flag"
-	"github.com/markburgess/MCP-SST/generated-server/mcptools" 
+
+	"github.com/markburgess/MCP-SST/generated-server/mcptools"
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// ***************************************************************
-
 func main() {
+	wsAddr := flag.String("ws", ":8889", "address for the SPA websocket hub")
+	flag.Usage = Usage
+	flag.Parse()
 
-	mcptools.SELF_SIGNED_CERT = Init()
+	// 1. Start the WS hub (non-blocking).
+	mcptools.StartWebSocketHub(*wsAddr)
 
-	// 1. Create a new MCP server
+	// 2. Build the MCP server + register tools.
+	mcpserver := server.NewMCPServer("MCP-SSTorytime", "1.1.0")
+	mcpserver.AddTool(mcptools.NewN4LqueryMCPTool(), mcptools.N4LqueryHandler)
+	mcpserver.AddTool(mcptools.NewListSessionsMCPTool(), mcptools.ListSessionsHandler)
 
-	mcpserver := server.NewMCPServer("MCP-SSTorytime", "1.0.0")
-	fmt.Println("Looking for a self-signed certificate at",mcptools.SELF_SIGNED_CERT)
-	
-	// 2. Register a tool (AddTool) with a handler function
-
-	mcpserver.AddTool(mcptools.NewN4LqueryMCPTool(),mcptools.N4LqueryHandler)
-
-	httpServer := server.NewStreamableHTTPServer(mcpserver)
-
-	// Start the server
-
-	fmt.Println("MCP server running on port 8888")
-	
-	if err := httpServer.Start(":8888"); err != nil {
-		fmt.Println("Server failed to start: %v", err)
-		os.Exit(-1)
+	// 3. Serve MCP over stdio — the transport Claude Code expects
+	// when registered with `claude mcp add <name> -- <cmd>`.
+	if err := server.ServeStdio(mcpserver); err != nil {
+		fmt.Fprintf(os.Stderr, "MCP stdio server: %v\n", err)
+		os.Exit(1)
 	}
 }
 
-
-// ******************************************************************************
-
-func Init() string {
-
-	flag.Usage = Usage
-
-	resourcePtr := flag.String("cert", "../server/cert.pem", "self-signed certicate path/name")
-
-	flag.Parse()
-
-	return *resourcePtr
-}
-
-//**************************************************************
-
 func Usage() {
-
-	fmt.Printf("usage: main [-cert path/to/https-cert]\n")
+	fmt.Fprintf(os.Stderr, "usage: %s [-ws :port]\n", os.Args[0])
+	flag.PrintDefaults()
 	os.Exit(1)
 }
-
